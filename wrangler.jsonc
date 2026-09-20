@@ -4,6 +4,5 @@
   "main": "src/worker.js",
   "compatibility_date": "2026-09-01",
   "assets": { "directory": "./public", "binding": "ASSETS", "not_found_handling": "single-page-application" },
-  "d1_databases": [{ "binding": "DB", "database_name": "zairen-portfolio-db", "database_id": "REPLACE_WITH_D1_DATABASE_ID" }],
-  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "zairen-portfolio-media" }]
+  "d1_databases": [{ "binding": "DB", "database_name": "zairen-portfolio-db", "database_id": "8e956b21-7e5a-4dc9-81a3-7851f0de3a78" }]
 }
