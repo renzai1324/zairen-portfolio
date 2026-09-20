@@ -16,8 +16,6 @@ export default {
       const itemMatch = url.pathname.match(/^\/api\/items\/(\d+)$/);
       if (itemMatch && request.method === "PATCH") return updateItem(request, env, Number(itemMatch[1]));
       if (itemMatch && request.method === "DELETE") return deleteItem(request, env, Number(itemMatch[1]));
-      const mediaMatch = url.pathname.match(/^\/media\/(.+)$/);
-      if (mediaMatch && request.method === "GET") return getMedia(env, decodeURIComponent(mediaMatch[1]));
       return env.ASSETS.fetch(request);
     } catch (error) {
       console.error(error);
@@ -101,21 +99,12 @@ async function createItem(request, env) {
   const category = String(form.get("category") || "");
   const title = String(form.get("title") || "").trim();
   const description = String(form.get("description") || "").trim();
-  let mediaUrl = String(form.get("mediaUrl") || "").trim();
-  let mediaType = String(form.get("mediaType") || "link");
+  const mediaUrl = String(form.get("mediaUrl") || "").trim();
+  const mediaType = String(form.get("mediaType") || "link");
   const sortOrder = Number(form.get("sortOrder") || 0);
-  let objectKey = null;
   if (!["video", "mentorship", "ebook"].includes(category) || !title) return json({ error: "Section and title are required." }, 400);
-  const file = form.get("file");
-  if (file instanceof File && file.size) {
-    if (file.size > 25 * 1024 * 1024) return json({ error: "Uploads must be 25 MB or smaller. Use a link for larger video files." }, 400);
-    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80);
-    objectKey = `${Date.now()}-${crypto.randomUUID()}-${safe}`;
-    await env.BUCKET.put(objectKey, file.stream(), { httpMetadata: { contentType: file.type || "application/octet-stream" } });
-    mediaUrl = `/media/${encodeURIComponent(objectKey)}`;
-    mediaType = file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : file.type === "application/pdf" ? "pdf" : "link";
-  }
-  const result = await env.DB.prepare("INSERT INTO items (category,title,description,media_url,media_type,object_key,sort_order) VALUES (?,?,?,?,?,?,?) RETURNING *").bind(category, title, description, mediaUrl, mediaType, objectKey, Number.isFinite(sortOrder) ? sortOrder : 0).first();
+  if (mediaUrl && !validHttpUrl(mediaUrl)) return json({ error: "Media URL must begin with http:// or https://." }, 400);
+  const result = await env.DB.prepare("INSERT INTO items (category,title,description,media_url,media_type,object_key,sort_order) VALUES (?,?,?,?,?,NULL,?) RETURNING *").bind(category, title, description, mediaUrl, mediaType, Number.isFinite(sortOrder) ? sortOrder : 0).first();
   return json({ item: result }, 201);
 }
 
@@ -123,22 +112,16 @@ async function updateItem(request, env, id) {
   const admin = await requireAdmin(request, env); if (admin instanceof Response) return admin;
   const body = await request.json();
   if (!["video", "mentorship", "ebook"].includes(body.category) || !String(body.title || "").trim()) return json({ error: "Section and title are required." }, 400);
-  const item = await env.DB.prepare("UPDATE items SET category=?, title=?, description=?, media_url=?, media_type=?, sort_order=? WHERE id=? RETURNING *").bind(body.category, String(body.title).trim(), String(body.description || "").trim(), String(body.mediaUrl || "").trim(), String(body.mediaType || "link"), Number(body.sortOrder || 0), id).first();
+  const mediaUrl = String(body.mediaUrl || "").trim();
+  if (mediaUrl && !validHttpUrl(mediaUrl)) return json({ error: "Media URL must begin with http:// or https://." }, 400);
+  const item = await env.DB.prepare("UPDATE items SET category=?, title=?, description=?, media_url=?, media_type=?, object_key=NULL, sort_order=? WHERE id=? RETURNING *").bind(body.category, String(body.title).trim(), String(body.description || "").trim(), mediaUrl, String(body.mediaType || "link"), Number(body.sortOrder || 0), id).first();
   return json({ item });
 }
 
 async function deleteItem(request, env, id) {
   const admin = await requireAdmin(request, env); if (admin instanceof Response) return admin;
-  const item = await env.DB.prepare("SELECT object_key FROM items WHERE id=?").bind(id).first();
-  if (item?.object_key) await env.BUCKET.delete(item.object_key);
   await env.DB.prepare("DELETE FROM items WHERE id=?").bind(id).run();
   return json({ ok: true });
-}
-
-async function getMedia(env, key) {
-  const object = await env.BUCKET.get(key); if (!object) return new Response("Not found", { status: 404 });
-  const headers = new Headers(); object.writeHttpMetadata(headers); headers.set("etag", object.httpEtag); headers.set("cache-control", "public,max-age=31536000,immutable");
-  return new Response(object.body, { headers });
 }
 
 async function derivePassword(password, salt) {
@@ -152,4 +135,5 @@ function randomToken(size) { const bytes = crypto.getRandomValues(new Uint8Array
 function timingSafeEqual(a, b) { if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false; let diff = 0; for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i); return diff === 0; }
 function cookie(request, name) { const value = request.headers.get("cookie") || ""; const match = value.match(new RegExp(`(?:^|; )${name}=([^;]*)`)); return match ? decodeURIComponent(match[1]) : null; }
 function validEmail(value) { return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
+function validHttpUrl(value) { try { const url = new URL(value); return url.protocol === "http:" || url.protocol === "https:"; } catch { return false; } }
 function json(data, status = 200, extra = {}) { return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", ...extra } }); }
