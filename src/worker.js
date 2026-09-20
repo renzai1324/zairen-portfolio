@@ -101,10 +101,13 @@ async function createItem(request, env) {
   const description = String(form.get("description") || "").trim();
   const mediaUrl = String(form.get("mediaUrl") || "").trim();
   const mediaType = String(form.get("mediaType") || "link");
+  const thumbnailData = String(form.get("thumbnailData") || "").trim();
   const sortOrder = Number(form.get("sortOrder") || 0);
   if (!["video", "mentorship", "ebook"].includes(category) || !title) return json({ error: "Section and title are required." }, 400);
-  if (mediaUrl && !validMediaUrl(mediaUrl)) return json({ error: "Use a valid public link or an uploaded thumbnail smaller than 700 KB." }, 400);
-  const result = await env.DB.prepare("INSERT INTO items (category,title,description,media_url,media_type,object_key,sort_order) VALUES (?,?,?,?,?,NULL,?) RETURNING *").bind(category, title, description, mediaUrl, mediaType, Number.isFinite(sortOrder) ? sortOrder : 0).first();
+  if (mediaUrl && !validHttpUrl(mediaUrl)) return json({ error: "The sample link must begin with http:// or https://." }, 400);
+  if (thumbnailData && !validThumbnail(thumbnailData)) return json({ error: "The thumbnail must be a valid image smaller than 700 KB." }, 400);
+  const storedMedia = packMedia(mediaUrl, thumbnailData);
+  const result = await env.DB.prepare("INSERT INTO items (category,title,description,media_url,media_type,object_key,sort_order) VALUES (?,?,?,?,?,NULL,?) RETURNING *").bind(category, title, description, storedMedia, mediaType, Number.isFinite(sortOrder) ? sortOrder : 0).first();
   return json({ item: result }, 201);
 }
 
@@ -113,8 +116,13 @@ async function updateItem(request, env, id) {
   const body = await request.json();
   if (!["video", "mentorship", "ebook"].includes(body.category) || !String(body.title || "").trim()) return json({ error: "Section and title are required." }, 400);
   const mediaUrl = String(body.mediaUrl || "").trim();
-  if (mediaUrl && !validMediaUrl(mediaUrl)) return json({ error: "Use a valid public link or an uploaded thumbnail smaller than 700 KB." }, 400);
-  const item = await env.DB.prepare("UPDATE items SET category=?, title=?, description=?, media_url=?, media_type=?, object_key=NULL, sort_order=? WHERE id=? RETURNING *").bind(body.category, String(body.title).trim(), String(body.description || "").trim(), mediaUrl, String(body.mediaType || "link"), Number(body.sortOrder || 0), id).first();
+  if (mediaUrl && !validHttpUrl(mediaUrl)) return json({ error: "The sample link must begin with http:// or https://." }, 400);
+  const existing = await env.DB.prepare("SELECT media_url FROM items WHERE id=?").bind(id).first();
+  const previousMedia = unpackMedia(existing?.media_url);
+  const thumbnailData = typeof body.thumbnailData === "string" ? body.thumbnailData.trim() : previousMedia.thumbnail;
+  if (thumbnailData && !validThumbnail(thumbnailData)) return json({ error: "The thumbnail must be a valid image smaller than 700 KB." }, 400);
+  const storedMedia = packMedia(mediaUrl, thumbnailData);
+  const item = await env.DB.prepare("UPDATE items SET category=?, title=?, description=?, media_url=?, media_type=?, object_key=NULL, sort_order=? WHERE id=? RETURNING *").bind(body.category, String(body.title).trim(), String(body.description || "").trim(), storedMedia, String(body.mediaType || "link"), Number(body.sortOrder || 0), id).first();
   return json({ item });
 }
 
@@ -136,5 +144,7 @@ function timingSafeEqual(a, b) { if (typeof a !== "string" || typeof b !== "stri
 function cookie(request, name) { const value = request.headers.get("cookie") || ""; const match = value.match(new RegExp(`(?:^|; )${name}=([^;]*)`)); return match ? decodeURIComponent(match[1]) : null; }
 function validEmail(value) { return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
 function validHttpUrl(value) { try { const url = new URL(value); return url.protocol === "http:" || url.protocol === "https:"; } catch { return false; } }
-function validMediaUrl(value) { return validHttpUrl(value) || (value.length <= 700000 && /^data:image\/(?:webp|jpeg|png);base64,[a-z0-9+/=]+$/i.test(value)); }
+function validThumbnail(value) { return value.length <= 700000 && /^data:image\/(?:webp|jpeg|png);base64,[a-z0-9+/=]+$/i.test(value); }
+function unpackMedia(value) { const raw=String(value||""); if(raw.startsWith("{")){try{const parsed=JSON.parse(raw);return{link:validHttpUrl(parsed.link)?parsed.link:"",thumbnail:validThumbnail(parsed.thumbnail||"")?parsed.thumbnail:""}}catch{}} return validThumbnail(raw)?{link:"",thumbnail:raw}:{link:validHttpUrl(raw)?raw:"",thumbnail:""}; }
+function packMedia(link, thumbnail) { return thumbnail ? JSON.stringify({ link, thumbnail }) : link; }
 function json(data, status = 200, extra = {}) { return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", ...extra } }); }
