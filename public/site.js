@@ -1,4 +1,4 @@
-const fallbackIntro="I’m Zairen, an AI faceless-content creator focused on Facebook content. I create videos for GEO, cooking, health and remedies, home tips, and other niches using skeleton characters, 3D visuals, and 2D styles. I also customize eBooks and guide beginners through the content workflow I personally use.";
+const fallbackIntro="I’m Zairen, an AI faceless-content creator focused on Facebook content. I create videos for GEO, cooking, health and remedies, home tips, and other niches using skeleton characters and 3D visuals. I also customize eBooks and guide beginners through the content workflow I personally use.";
 let allItems=[];
 document.querySelector('.menu').addEventListener('click',e=>{const nav=document.querySelector('nav');nav.classList.toggle('open');e.currentTarget.setAttribute('aria-expanded',nav.classList.contains('open'))});
 document.querySelectorAll('nav a').forEach(a=>a.addEventListener('click',()=>document.querySelector('nav').classList.remove('open')));
