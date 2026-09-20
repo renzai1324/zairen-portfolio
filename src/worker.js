@@ -126,7 +126,7 @@ async function deleteItem(request, env, id) {
 
 async function derivePassword(password, salt) {
   const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: encoder.encode(salt), iterations: 310000 }, key, 256);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: encoder.encode(salt), iterations: 50000 }, key, 256);
   return bytesToHex(new Uint8Array(bits));
 }
 async function sha256(value) { const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value)); return bytesToHex(new Uint8Array(digest)); }
