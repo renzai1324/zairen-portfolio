@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS admins (email TEXT PRIMARY KEY, salt TEXT NOT NULL, password_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, email TEXT NOT NULL, expires_at INTEGER NOT NULL, FOREIGN KEY(email) REFERENCES admins(email) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY CHECK(id = 1), introduction TEXT NOT NULL DEFAULT '', telegram TEXT NOT NULL DEFAULT '@zairenjan', discord TEXT NOT NULL DEFAULT 'its_zairen', updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT NOT NULL CHECK(category IN ('video','mentorship','ebook')), title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', media_url TEXT NOT NULL DEFAULT '', media_type TEXT NOT NULL DEFAULT 'link', object_key TEXT, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX IF NOT EXISTS idx_items_order ON items(category, sort_order, id);
