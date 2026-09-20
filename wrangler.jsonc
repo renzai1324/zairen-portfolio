@@ -3,6 +3,17 @@
   "name": "zairen-portfolio",
   "main": "src/worker.js",
   "compatibility_date": "2026-09-01",
-  "assets": { "directory": "./public", "binding": "ASSETS", "not_found_handling": "single-page-application" },
-  "d1_databases": [{ "binding": "DB", "database_name": "zairen-portfolio-db", "database_id": "8e956b21-7e5a-4dc9-81a3-7851f0de3a78" }]
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "zairen-portfolio-db",
+      "database_id": "8e956b21-7e5a-4dc9-81a3-7851f0de3a78"
+    }
+  ],
+  "workers_dev": true
 }
